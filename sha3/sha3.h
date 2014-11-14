@@ -1,0 +1,86 @@
+// Copyright (c) 2014 Chilean Krypto-Miners. 
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#ifndef _SHA3_H_
+#define _SHA3_H_ 1
+
+#include <stddef.h>
+#include "KeccakHash.h"
+
+// Keccak parameters for SHA3 as in FIPS 202 draft. **** NOT FINAL YET ****
+
+// SHA3-224
+#define SHA3_224_L   224             // Length in bits
+#define SHA3_224_DL (SHA3_224_L / 8) // Digest length in bytes
+
+// SHA3-256
+#define SHA3_256_L   256             // Length in bits 
+#define SHA3_256_DL (SHA3_256_L / 8) // Digest length in bytes
+
+// SHA3-384
+#define SHA3_384_L   384             // Length in bits
+#define SHA3_384_DL (SHA3_384_L / 8) // Digest length in bytes
+
+// SHA3-512
+#define SHA3_512_L   512             // Length in bits
+#define SHA3_512_DL (SHA3_512_L / 8) // Digest length in bytes
+
+#define SHAKE_MAX_BITS (128*1024*8)  // 1 Mbits limit
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
+extern unsigned char *SHA3_224(const unsigned char *dataIn, size_t nBytesIn, unsigned char *md);
+extern unsigned char *SHA3_256(const unsigned char *dataIn, size_t nBytesIn, unsigned char *md);
+extern unsigned char *SHA3_384(const unsigned char *dataIn, size_t nBytesIn, unsigned char *md);
+extern unsigned char *SHA3_512(const unsigned char *dataIn, size_t nBytesIn, unsigned char *md);
+extern            int SHAKE128(const unsigned char *dataIn, size_t  nBitsIn, unsigned char *md, int nOutBytes);
+extern            int SHAKE256(const unsigned char *dataIn, size_t  nBitsIn, unsigned char *md, int nOutBytes);
+
+#if defined (__cplusplus)
+}
+#endif
+
+
+// These below are not NIST standard SHA3 or SHAKE hash functions.
+
+#define KECCAK_F 1600
+
+// KHASH320 (what could have been SHA3_320)
+#define KHASH320_P  0x06 // Prefix
+#define KHASH320_L   320 // Length (bits) 
+#define KHASH320_C   640 // Capacity
+#define KHASH320_R  (KECCAK_F - KHASH320_C) // Rate
+#define KHASH320_DL (KHASH320_L / 8) // Digest length in bytes
+
+// KSHAKE320 (what could have been SHAKE320)
+#define KSHAKE320_P  0x1f // Prefix
+#define KSHAKE320_C   640 // Capacity
+#define KSHAKE320_R  (KECCAK_F - KHASH320_C) // Rate
+
+// KSHAKE160 (what could have been SHAKE160)
+#define KSHAKE160_P  0x1F // Prefix
+#define KSHAKE160_C   320 // Capacity
+#define KSHAKE160_R  (KECCAK_F - KSHAKE160_C) // Rate
+
+// KSHAKE80 (what could have been SHAKE80)
+#define KSHAKE80_P  0x1F // Prefix
+#define KSHAKE80_C   160 // Capacity
+#define KSHAKE80_R  (KECCAK_F - KSHAKE80_C) // Rate
+
+#if defined (__cplusplus)
+extern "C" {
+#endif
+
+extern unsigned char *KHASH320(const unsigned char *dataIn, size_t nBytesIn, unsigned char *md);
+extern           int  KSHAKE80(const unsigned char *dataIn, size_t  nBitsIn, unsigned char *md, int nOutBytes);
+extern           int KSHAKE160(const unsigned char *dataIn, size_t  nBitsIn, unsigned char *md, int nOutBytes);
+extern           int KSHAKE320(const unsigned char *dataIn, size_t  nBitsIn, unsigned char *md, int nOutBytes);
+
+#if defined (__cplusplus)
+}
+#endif
+#endif
+
