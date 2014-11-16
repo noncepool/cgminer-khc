@@ -4412,6 +4412,19 @@ static void set_curblock(char *hexstr, unsigned char *bedata)
 	applog(LOG_INFO, "New block: %s... diff %s", current_hash, block_diff);
 }
 
+static void clear_curblock(char *hexstr, unsigned char *bedata)
+{
+    cg_wlock(&ch_lock);
+    cgtime(&block_timeval);
+    strcpy(current_hash, hexstr);
+    memcpy(current_block, bedata, 40);
+    get_timestamp(blocktime, sizeof(blocktime), &block_timeval);
+    cg_wunlock(&ch_lock);
+
+    strncpy(prev_block, current_hash, 10);
+    prev_block[10] = '\0';
+}
+
 #else
 
 static void set_curblock(char *hexstr, unsigned char *bedata)
@@ -4445,8 +4458,9 @@ static bool block_exists(char *hexstr)
 	HASH_FIND_STR(blocks, hexstr, s);
 	rd_unlock(&blk_lock);
 
-	if (s)
-		return true;
+    if (s) {
+        return true;
+    }
 	return false;
 }
 
@@ -4496,9 +4510,9 @@ static bool test_work_current(struct work *work)
 	char hexstr[82];
 	bool ret = true;
 
-	if (work->mandatory)
-		return ret;
-
+    if (work->mandatory) {
+        return ret;
+    }
 #if 1
     memcpy(bedata, work->data + 8, sizeof(bedata));
     __bin2hex(hexstr, bedata, 40);
@@ -4513,15 +4527,17 @@ static bool test_work_current(struct work *work)
 		struct block *s = calloc(sizeof(struct block), 1);
 		int deleted_block = 0;
 
-		if (unlikely(!s))
-			quit (1, "test_work_current OOM");
+        if (unlikely(!s)) {
+            quit(1, "test_work_current OOM");
+        }
 		strcpy(s->hash, hexstr);
 		s->block_no = new_blocks++;
 
 		wr_lock(&blk_lock);
 		/* Only keep the last hour's worth of blocks in memory since
 		 * work from blocks before this is virtually impossible and we
-		 * want to prevent memory usage from continually rising */
+		 * want to prevent memory usage from continually rising 
+         */
 		if (HASH_COUNT(blocks) > 6) {
 			struct block *oldblock;
 
@@ -4535,11 +4551,13 @@ static bool test_work_current(struct work *work)
 		set_blockdiff(work);
 		wr_unlock(&blk_lock);
 
-		if (deleted_block)
-			applog(LOG_DEBUG, "Deleted block %d from database", deleted_block);
+        if (deleted_block) {
+            applog(LOG_DEBUG, "Deleted block %d from database", deleted_block);
+        }
 		set_curblock(hexstr, bedata);
 		/* Copy the information to this pool's prev_block since it
-		 * knows the new block exists. */
+		 * knows the new block exists. 
+         */
 		memcpy(pool->prev_block, bedata, 40);
 		if (unlikely(new_blocks == 1)) {
 			ret = false;
@@ -4553,47 +4571,51 @@ static bool test_work_current(struct work *work)
 				applog(LOG_NOTICE, "Stratum from pool %d detected new block",
 				       pool->pool_no);
 			} else {
-				applog(LOG_NOTICE, "%sLONGPOLL from pool %d detected new block",
-				       work->gbt ? "GBT " : "", work->pool->pool_no);
+				applog(LOG_NOTICE, "%sLONGPOLL from pool %d detected new block", work->gbt ? "GBT " : "", work->pool->pool_no);
 			}
-		} else if (have_longpoll)
-			applog(LOG_NOTICE, "New block detected on network before longpoll");
-		else
-			applog(LOG_NOTICE, "New block detected on network");
+        }
+        else if (have_longpoll) {
+            applog(LOG_NOTICE, "New block detected on network before longpoll");
+        }
+        else {
+            applog(LOG_NOTICE, "New block detected on network");
+        }
 		restart_threads();
-	} else {
-		if (memcmp(pool->prev_block, bedata, 40)) {
-			/* Work doesn't match what this pool has stored as
-			 * prev_block. Let's see if the work is from an old
-			 * block or the pool is just learning about a new
-			 * block. */
-			if (memcmp(bedata, current_block, 40)) {
-				/* Doesn't match current block. It's stale */
-				applog(LOG_DEBUG, "Stale data from pool %d", pool->pool_no);
-				ret = false;
-			} else {
-				/* Work is from new block and pool is up now
-				 * current. */
-				applog(LOG_INFO, "Pool %d now up to date", pool->pool_no);
-				memcpy(pool->prev_block, bedata, 40);
-			}
-		}
+    }
+    else {
+        if (memcmp(pool->prev_block, bedata, 40)) {
+            /* Work doesn't match what this pool has stored as
+             * prev_block. Let's see if the work is from an old
+             * block or the pool is just learning about a new
+             * block. */
+            if (memcmp(bedata, current_block, 40)) {
+                /* Doesn't match current block. It's stale */
+                applog(LOG_DEBUG, "Stale data from pool %d", pool->pool_no);
+                ret = false;
+            }
+            else {
+                /* Work is from new block and pool is up now
+                 * current. */
+                applog(LOG_INFO, "Pool %d now up to date", pool->pool_no);
+                memcpy(pool->prev_block, bedata, 40);
+            }
+        }
 #if 0
-		/* This isn't ideal, this pool is still on an old block but
-		 * accepting shares from it. To maintain fair work distribution
-		 * we work on it anyway. */
-		if (memcmp(bedata, current_block, 40))
-			applog(LOG_DEBUG, "Pool %d still on old block", pool->pool_no);
+        /* This isn't ideal, this pool is still on an old block but
+         * accepting shares from it. To maintain fair work distribution
+         * we work on it anyway. */
+        if (memcmp(bedata, current_block, 40)) {
+            applog(LOG_DEBUG, "Pool %d still on old block", pool->pool_no);
+        }
 #endif
 		if (work->longpoll) {
 			work->work_block = ++work_block;
 			if (shared_strategy() || work->pool == current_pool()) {
 				if (work->stratum) {
-					applog(LOG_NOTICE, "Stratum from pool %d requested work restart",
-					       pool->pool_no);
-				} else {
-					applog(LOG_NOTICE, "%sLONGPOLL from pool %d requested work restart",
-					       work->gbt ? "GBT " : "", work->pool->pool_no);
+					applog(LOG_NOTICE, "Stratum from pool %d requested work restart", pool->pool_no);
+				} 
+                else {
+					applog(LOG_NOTICE, "%sLONGPOLL from pool %d requested work restart", work->gbt ? "GBT " : "", work->pool->pool_no);
 				}
 				restart_threads();
 			}
@@ -4732,13 +4754,16 @@ static bool hash_push(struct work *work)
 	bool rc = true;
 
 	mutex_lock(stgd_lock);
-	if (work_rollable(work))
-		staged_rollable++;
+    if (work_rollable(work)) {
+        staged_rollable++;
+    }
 	if (likely(!getq->frozen)) {
 		HASH_ADD_INT(staged_work, id, work);
 		HASH_SORT(staged_work, tv_sort);
-	} else
-		rc = false;
+    }
+    else {
+        rc = false;
+    }
 	pthread_cond_broadcast(&getq->cond);
 	mutex_unlock(stgd_lock);
 
@@ -4754,7 +4779,8 @@ static void *stage_thread(void *userdata)
 
 	RenameThread("stage");
 
-	while (ok) {
+	while (ok) 
+    {
 		struct work *work = NULL;
 
 		applog(LOG_DEBUG, "Popping work to stage thread");
@@ -5860,7 +5886,8 @@ void clear_stratum_shares(struct pool *pool)
 	int cleared = 0;
 
 	mutex_lock(&sshare_lock);
-	HASH_ITER(hh, stratum_shares, sshare, tmpshare) {
+	HASH_ITER(hh, stratum_shares, sshare, tmpshare) 
+    {
 		if (sshare->work->pool == pool) {
 			HASH_DEL(stratum_shares, sshare);
 			diff_cleared += sshare->work->work_difficulty;
@@ -5887,7 +5914,8 @@ static void clear_pool_work(struct pool *pool)
 	int cleared = 0;
 
 	mutex_lock(stgd_lock);
-	HASH_ITER(hh, staged_work, work, tmp) {
+	HASH_ITER(hh, staged_work, work, tmp) 
+    {
 		if (work->pool == pool) {
 			HASH_DEL(staged_work, work);
 			free_work(work);
@@ -5914,40 +5942,48 @@ static bool cnx_needed(struct pool *pool)
 {
 	struct pool *cp;
 
-	if (pool->enabled != POOL_ENABLED)
-		return false;
-
+    if (pool->enabled != POOL_ENABLED) {
+        return false;
+    }
 	/* Balance strategies need all pools online */
-	if (pool_strategy == POOL_BALANCE)
-		return true;
-	if (pool_strategy == POOL_LOADBALANCE)
-		return true;
-
+    if (pool_strategy == POOL_BALANCE) {
+        return true;
+    }
+    if (pool_strategy == POOL_LOADBALANCE) {
+        return true;
+    }
 	/* Idle stratum pool needs something to kick it alive again */
-	if (pool->has_stratum && pool->idle)
-		return true;
-
+    if (pool->has_stratum && pool->idle) {
+        return true;
+    }
 	/* Getwork pools without opt_fail_only need backup pools up to be able
 	 * to leak shares */
 	cp = current_pool();
-	if (cp == pool)
-		return true;
-	if (!pool_localgen(cp) && (!opt_fail_only || !cp->hdr_path))
-		return true;
+    if (cp == pool) {
+        return true;
+    }
+    if (!pool_localgen(cp) && (!opt_fail_only || !cp->hdr_path)) {
+        return true;
+    }
 	/* If we're waiting for a response from shares submitted, keep the
 	 * connection open. */
-	if (pool->sshares)
-		return true;
+    if (pool->sshares) {
+        return true;
+    }
 	/* If the pool has only just come to life and is higher priority than
 	 * the current pool keep the connection open so we can fail back to
 	 * it. */
-	if (pool_strategy == POOL_FAILOVER && pool->prio < cp_prio())
-		return true;
-	if (pool_unworkable(cp))
-		return true;
+    if (pool_strategy == POOL_FAILOVER && pool->prio < cp_prio()) {
+        return true;
+    }
+    if (pool_unworkable(cp)) {
+        return true;
+    }
 	/* We've run out of work, bring anything back to life. */
-	if (no_work)
-		return true;
+    if (no_work) {
+        return true;
+    }
+
 	return false;
 }
 
@@ -5957,8 +5993,9 @@ static void gen_stratum_work(struct pool *pool, struct work *work);
 
 static void stratum_resumed(struct pool *pool)
 {
-	if (!pool->stratum_notify)
-		return;
+    if (!pool->stratum_notify) {
+        return;
+    }
 	if (pool_tclear(pool, &pool->idle)) {
 		applog(LOG_INFO, "Stratum connection to pool %d resumed", pool->pool_no);
 		pool_resus(pool);
@@ -5996,9 +6033,9 @@ static void *stratum_rthread(void *userdata)
 		fd_set rd;
 		char *s;
 
-		if (unlikely(pool->removed))
-			break;
-
+        if (unlikely(pool->removed)) {
+            break;
+        }
 		/* Check to see whether we need to maintain this connection
 		 * indefinitely or just bring it up when we switch to this
 		 * pool */
@@ -6010,9 +6047,11 @@ static void *stratum_rthread(void *userdata)
 			wait_lpcurrent(pool);
 			if (!restart_stratum(pool)) {
 				pool_died(pool);
-				while (!restart_stratum(pool)) {
-					if (pool->removed)
-						goto out;
+				while (!restart_stratum(pool)) 
+                {
+                    if (pool->removed) {
+                        goto out;
+                    }
 					cgsleep_ms(30000);
 				}
 			}
@@ -6030,8 +6069,10 @@ static void *stratum_rthread(void *userdata)
 		if (!sock_full(pool) && (sel_ret = select(pool->sock + 1, &rd, NULL, NULL, &timeout)) < 1) {
 			applog(LOG_DEBUG, "Stratum select failed on pool %d with value %d", pool->pool_no, sel_ret);
 			s = NULL;
-		} else
-			s = recv_line(pool);
+        }
+        else {
+            s = recv_line(pool);
+        }
 		if (!s) {
 			applog(LOG_NOTICE, "Stratum connection to pool %d interrupted", pool->pool_no);
 			pool->getfail_occasions++;
@@ -6040,19 +6081,22 @@ static void *stratum_rthread(void *userdata)
 			/* If the socket to our stratum pool disconnects, all
 			 * tracked submitted shares are lost and we will leak
 			 * the memory if we don't discard their records. */
-			if (!supports_resume(pool) || opt_lowmem)
-				clear_stratum_shares(pool);
+            if (!supports_resume(pool) || opt_lowmem) {
+                clear_stratum_shares(pool);
+            }
 			clear_pool_work(pool);
-			if (pool == current_pool())
-				restart_threads();
-
-			if (restart_stratum(pool))
-				continue;
-
+            if (pool == current_pool()) {
+                restart_threads();
+            }
+            if (restart_stratum(pool)) {
+                continue;
+            }
 			pool_died(pool);
-			while (!restart_stratum(pool)) {
-				if (pool->removed)
-					goto out;
+			while (!restart_stratum(pool)) 
+            {
+                if (pool->removed) {
+                    goto out;
+                }
 				cgsleep_ms(30000);
 			}
 			stratum_resumed(pool);
@@ -6063,8 +6107,9 @@ static void *stratum_rthread(void *userdata)
 		 * has not had its idle flag cleared */
 		stratum_resumed(pool);
 
-		if (!parse_method(pool, s) && !parse_stratum_response(pool, s))
-			applog(LOG_INFO, "Unknown stratum msg: %s", s);
+        if (!parse_method(pool, s) && !parse_stratum_response(pool, s)) {
+            applog(LOG_INFO, "Unknown stratum msg: %s", s);
+        }
 		free(s);
 		if (pool->swork.clean) {
 			struct work *work = make_work();
@@ -6434,7 +6479,8 @@ static struct work *hash_pop(void)
 	int hc;
 
 	mutex_lock(stgd_lock);
-	while (!HASH_COUNT(staged_work)) {
+	while (!HASH_COUNT(staged_work)) 
+    {
 		struct timespec then;
 		struct timeval now;
 		int rc;
@@ -6445,32 +6491,38 @@ static struct work *hash_pop(void)
 		pthread_cond_signal(&gws_cond);
 		rc = pthread_cond_timedwait(&getq->cond, stgd_lock, &then);
 		/* Check again for !no_work as multiple threads may be
-			* waiting on this condition and another may set the
-			* bool separately. */
+		 * waiting on this condition and another may set the
+		 * bool separately. 
+         */
 		if (rc && !no_work) {
 			no_work = true;
-			applog(LOG_WARNING, "Waiting for work to be available from pools.");
+			applog(LOG_DEBUG, "Waiting for work to be available from pools.");
 		}
 	}
 
 	if (no_work) {
-		applog(LOG_WARNING, "Work available from pools, resuming.");
+        applog(LOG_DEBUG, "Work available from pools, resuming.");
 		no_work = false;
 	}
 
 	hc = HASH_COUNT(staged_work);
 	/* Find clone work if possible, to allow masters to be reused */
 	if (hc > staged_rollable) {
-		HASH_ITER(hh, staged_work, work, tmp) {
-			if (!work_rollable(work))
-				break;
+		HASH_ITER(hh, staged_work, work, tmp) 
+        {
+            if (!work_rollable(work)) {
+                break;
+            }
 		}
-	} else
-		work = staged_work;
-	HASH_DEL(staged_work, work);
-	if (work_rollable(work))
-		staged_rollable--;
+	} 
+    else {
+        work = staged_work;
+    }
 
+	HASH_DEL(staged_work, work);
+    if (work_rollable(work)) {
+        staged_rollable--;
+    }
 	/* Signal the getwork scheduler to look for more work */
 	pthread_cond_signal(&gws_cond);
 
@@ -6901,9 +6953,9 @@ static void update_work_stats(struct thr_info *thr, struct work *work)
 
 	work->share_diff = share_diff(work);
 
-	if (opt_scrypt)
-		test_diff *= 65536;
-
+    if (opt_scrypt) {
+        test_diff *= 65536;
+    }
 	if (unlikely(work->share_diff >= test_diff)) {
 		work->block = true;
 		work->pool->solved++;
@@ -7224,14 +7276,17 @@ static void fill_queue(struct thr_info *mythr, struct cgpu_info *cgpu, struct de
 			wr_lock(&cgpu->qlock);
 			/* Check we haven't grabbed work somehow between
 			 * checking and picking up the lock. */
-			if (likely(!cgpu->unqueued_work))
-				cgpu->unqueued_work = work;
-			else
-				need_work = false;
+            if (likely(!cgpu->unqueued_work)) {
+                cgpu->unqueued_work = work;
+            }
+            else {
+                need_work = false;
+            }
 			wr_unlock(&cgpu->qlock);
 
-			if (unlikely(!need_work))
-				discard_work(work);
+            if (unlikely(!need_work)) {
+                discard_work(work);
+            }
 		}
 		/* The queue_full function should be used by the driver to
 		 * actually place work items on the physical device if it
@@ -9233,6 +9288,7 @@ begin_bench:
 		int ts, max_staged = opt_queue;
 		struct pool *pool, *cp;
 		bool lagging = false;
+        bool logging = true;
 		struct work *work;
 
         if (opt_work_update) {
@@ -9246,6 +9302,7 @@ begin_bench:
         if (!pool_localgen(cp) && !staged_rollable) {
             max_staged += mining_threads;
         }
+
 		mutex_lock(stgd_lock);
 		ts = __total_staged();
 
@@ -9264,7 +9321,7 @@ begin_bench:
         }
 
         if (lagging && !pool_tset(cp, &cp->lagging)) {
-            applog(LOG_WARNING, "Pool %d not providing work fast enough", cp->pool_no);
+            applog(LOG_DEBUG, "Pool %d not providing work fast enough", cp->pool_no);
             cp->getfail_occasions++;
             total_go++;
         }
@@ -9347,8 +9404,17 @@ retry:
         // Unlike Bitcoin (and others), Kryptohash won't give miners dummy work.
         // When Mempool is empty, Kryptohash returns diff equal 0 and we ignore the work.
         if (raw_diff(work) == 0) {
-            applog(LOG_DEBUG, "Pool %d does not have work, retrying in 3s", pool->pool_no);
             cgsleep_ms(3000);
+            if (logging) {
+                unsigned char bedata[40];
+                char hexstr[82];
+
+                logging = false;
+                applog(LOG_WARNING, "Waiting for work from Pool %d", pool->pool_no);
+                memset(bedata, 0, sizeof(bedata));
+                __bin2hex(hexstr, bedata, 40);
+                clear_curblock(hexstr, bedata);
+            }
             goto retry2;
         }
 #endif
