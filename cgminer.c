@@ -108,7 +108,7 @@ const int opt_cutofftemp = 95;
 int opt_log_interval = 5;
 #ifdef USE_KRYPTOHASH
 int opt_queue = 0;
-int opt_expiry = 10;
+int opt_expiry = 30;
 #else
 int opt_queue = 1;
 int opt_expiry = 120;

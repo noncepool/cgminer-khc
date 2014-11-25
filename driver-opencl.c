@@ -1669,7 +1669,7 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,	int64_t 
     if (nonceoffset) {
         work->blk.nonce += nonceoffset;
     }
-    //applog(LOG_DEBUG, "Nonce 0x08%x for thread %i, virtual GPU %i", work->blk.nonce, thr_id, gpu->virtual_gpu);
+    //applog(LOG_DEBUG, "Nonce 0x%08x for thread %i, virtual GPU %i", work->blk.nonce, thr_id, gpu->virtual_gpu);
 #else
 	/* The amount of work scanned can fluctuate when intensity changes
 	 * and since we do this one cycle behind, we increment the work more
